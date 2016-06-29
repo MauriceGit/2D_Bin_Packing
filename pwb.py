@@ -16,7 +16,7 @@ def printResult(lock, result):
     if result[1] > bestScore:
         bestScore = result[1]
         print bestScore, result[0]
-        sys.stdout.flush();
+        sys.stdout.flush()
 
     lock.release()
 
@@ -67,6 +67,12 @@ def countSurroundingBlocks(mask, width, height, x, y, product):
 
     return blockCount
 
+
+# Der hier ist eeetwas besser, aber nicht viel.
+# Hier amch ich prinzipiell das Gleiche, wie bei dem Dummen Algorithmus.
+# Mit dem Unterschied, dass ich versuche, dass mindestens 2 Seiten vollen Kontakt mit irgendwas haben.
+# Also eine Ecke zum Beispiel. Ja? Jupp
+# Und wenn ich zwei Seiten habe, return ich das.
 # Try to get at most outer blocks aligned with other blocks or the side
 def placeProductInBagIntelligent(mask, width, height, product, productIndex):
     productPlaced = False
@@ -101,7 +107,6 @@ def placeProductInBagIntelligent(mask, width, height, product, productIndex):
 
 # Just take the first free space!
 def placeProductInBagDumb(mask, width, height, product, productIndex):
-    productPlaced = False
     countY = 0
     countX = 0
 
@@ -110,14 +115,12 @@ def placeProductInBagDumb(mask, width, height, product, productIndex):
         for x in range(countX, width-product[0]+1):
             if productFits(mask, product, countX, countY):
                 productToMask(mask, product, productIndex, countX, countY)
-                productPlaced = True
-                break
+                return True
             countX += 1
-        countY += 1
-        if productPlaced:
-            break
 
-    return productPlaced
+        countY += 1
+
+    return False
 
 def maskToList(mask, width, height, products, fillCosts):
 
@@ -134,7 +137,7 @@ def maskToList(mask, width, height, products, fillCosts):
 
             if not mask[y][x] in alreadyFound:
                 alreadyFound.append(mask[y][x])
-                resultList += [(x,y,mask[y][x])]
+                resultList.append((x,y,mask[y][x]))
                 resultValue += products[mask[y][x]][2]
 
     return resultList, resultValue
@@ -158,6 +161,7 @@ def fillBag(algorithm, bag, products, fillCosts):
         if algorithm(mask, bag[0], bag[1], products[i], i):
             listToDelete.append(i)
 
+
     listToDelete = sorted(listToDelete)
     offset = 0
 
@@ -172,13 +176,14 @@ def calcGreedyFilling(lock, algorithm, bags, products, fillCosts):
 
     resultList = []
     resultValue = 0
+
     for bag in bags:
         res, value = fillBag(algorithm, bag, products, fillCosts)
         #print value
         resultList += res
         resultValue += value
 
-    printResult(lock, (resultList, resultValue))
+    printResult(lock, (resultList, resultValue) )
 
 
 if __name__ == '__main__':
@@ -193,17 +198,17 @@ if __name__ == '__main__':
     lock = allocate_lock()
     threads = []
 
-    if True:
+    if False:
         for i in range(10):
             shuffle(products)
             thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagDumb, list(bags), list(products), fillCosts,))
             threads += [thread]
             thread.start()
 
-    products = sorted(products, key=lambda x: x[2], reverse=False)
-    thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts,))
-    threads += [thread]
-    thread.start()
+        products = sorted(products, key=lambda x: x[2], reverse=False)
+        thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts,))
+        threads += [thread]
+        thread.start()
 
     products = sorted(products, key=lambda x: x[2], reverse=True)
     thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts,))
