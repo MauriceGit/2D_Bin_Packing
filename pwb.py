@@ -29,11 +29,11 @@ def productFits(mask, product, xoffset, yoffset):
                 return False
     return True
 
-def productToMask(mask, product, productIndex, xoffset, yoffset):
+def productToMask(mask, product, xoffset, yoffset):
 
     for y in range(yoffset, yoffset+product[1]):
         for x in range(xoffset, xoffset+product[0]):
-            mask[y][x] = productIndex
+            mask[y][x] = product[3]
 
 def countFreeBlocks(mask, x1, y1, x2, y2):
     freeBlockCount = 0
@@ -74,7 +74,7 @@ def countSurroundingBlocks(mask, width, height, x, y, product):
 # Also eine Ecke zum Beispiel. Ja? Jupp
 # Und wenn ich zwei Seiten habe, return ich das.
 # Try to get at most outer blocks aligned with other blocks or the side
-def placeProductInBagIntelligent(mask, width, height, product, productIndex):
+def placeProductInBagIntelligent(mask, width, height, product):
     productPlaced = False
     countY = 0
     countX = 0
@@ -100,13 +100,13 @@ def placeProductInBagIntelligent(mask, width, height, product, productIndex):
             break
 
     if bestPosition[2] != -1:
-        productToMask(mask, product, productIndex, bestPosition[0], bestPosition[1])
+        productToMask(mask, product, bestPosition[0], bestPosition[1])
         productPlaced = True
 
     return productPlaced
 
 # Just take the first free space!
-def placeProductInBagDumb(mask, width, height, product, productIndex):
+def placeProductInBagDumb(mask, width, height, product):
     countY = 0
     countX = 0
 
@@ -114,7 +114,7 @@ def placeProductInBagDumb(mask, width, height, product, productIndex):
         countX = 0
         for x in range(countX, width-product[0]+1):
             if productFits(mask, product, countX, countY):
-                productToMask(mask, product, productIndex, countX, countY)
+                productToMask(mask, product, countX, countY)
                 return True
             countX += 1
 
@@ -150,17 +150,15 @@ def createMask(bag):
 
 # This function is allowed and required to delete elements of 'products'!
 # Returns (list, resultValue)
-def fillBag(algorithm, bag, products, fillCosts):
+def fillBag(algorithm, bag, products, savedProducts, fillCosts):
 
     mask = createMask(bag)
-    savedProducts = list(products)
 
     listToDelete = []
 
     for i in range(len(products)):
-        if algorithm(mask, bag[0], bag[1], products[i], i):
+        if algorithm(mask, bag[0], bag[1], products[i]):
             listToDelete.append(i)
-
 
     listToDelete = sorted(listToDelete)
     offset = 0
@@ -174,13 +172,16 @@ def fillBag(algorithm, bag, products, fillCosts):
 
 def calcGreedyFilling(lock, algorithm, bags, products, fillCosts):
 
-    resultList = []
+    resultList = [[] for x in range(len(bags))]
     resultValue = 0
 
+    savedProducts = sorted(list(products), key=lambda x: x[3])
+
     for bag in bags:
-        res, value = fillBag(algorithm, bag, products, fillCosts)
+        res, value = fillBag(algorithm, bag, products, savedProducts, fillCosts)
         #print value
-        resultList += res
+        # put the calculated bag to the right position (just like they came in originally!)
+        resultList[bag[2]] = res
         resultValue += value
 
     printResult(lock, (resultList, resultValue) )
@@ -198,9 +199,19 @@ if __name__ == '__main__':
     lock = allocate_lock()
     threads = []
 
-    if False:
-        for i in range(10):
+    # append index of the product to the tuple!
+    products = [products[i]+(i,) for i in range(len(products))]
+    bags = [bags[i]+(i,) for i in range(len(bags))]
+
+    if True:
+        for i in range(100):
             shuffle(products)
+            thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagDumb, list(bags), list(products), fillCosts,))
+            threads += [thread]
+            thread.start()
+
+        for i in range(100):
+            shuffle(bags)
             thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagDumb, list(bags), list(products), fillCosts,))
             threads += [thread]
             thread.start()
