@@ -204,15 +204,10 @@ if __name__ == '__main__':
     bags = [bags[i]+(i,) for i in range(len(bags))]
 
     if True:
-        for i in range(100):
+        for i in range(10):
             shuffle(products)
-            thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagDumb, list(bags), list(products), fillCosts,))
-            threads += [thread]
-            thread.start()
-
-        for i in range(100):
             shuffle(bags)
-            thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagDumb, list(bags), list(products), fillCosts,))
+            thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts,))
             threads += [thread]
             thread.start()
 
@@ -221,14 +216,30 @@ if __name__ == '__main__':
         threads += [thread]
         thread.start()
 
-    products = sorted(products, key=lambda x: x[2], reverse=True)
+        # Biggest values first
+        products = sorted(products, key=lambda x: x[2], reverse=True)
+        thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts,))
+        threads += [thread]
+        thread.start()
+
+        # Biggest products first
+        products = sorted(products, key=lambda x: x[0]*x[1], reverse=True)
+        thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts,))
+        threads += [thread]
+        thread.start()
+
+        # Biggest bags first
+        bags = sorted(bags, key=lambda x: x[0]*x[1], reverse=True)
+        thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts,))
+        threads += [thread]
+        thread.start()
+
+    # Biggest products combined with biggest values ???
+    products = sorted(products, key=lambda x: x[0]*x[1] + 10*x[2], reverse=True)
     thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts,))
     threads += [thread]
     thread.start()
 
-    # - Shuffle products (shuffle back)
-    # - Shuffle bags (and shuffle back)
-    # - Sort bags on size (and sort back)
     # - Sort products on value (ascending/descending) (sort back!)
     # - Sort products on size (ascending/descending) (sort back!)
     # - Sort bags (ascending/descending) (and sort back)
