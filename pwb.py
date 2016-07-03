@@ -684,10 +684,11 @@ if __name__ == '__main__':
     for p in products:
         namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=p[3], isPlaced=False))
 
-    for i in range(1):
-        runA1(list(bags), list(namedProducts), lock, fillCosts)
+    thread = Thread(target=runA1, args=(list(bags), list(namedProducts), lock, fillCosts))
+    threads += [thread]
+    thread.start()
 
-    if False:
+    if True:
         for i in range(10):
             shuffle(products)
             shuffle(bags)
