@@ -22,11 +22,10 @@ def printResult(lock, result, initiator, time):
     if result[1] > bestScore:
         bestScore = result[1]
         #print "initiator: " % (initiator, bestScore, result[0])
-        print 'initiator: {:15}, score: {:7}, time: {:04.2f}, result: {:10.10}...'.format(initiator, bestScore, time, result[0])
+        print 'initiator: {:15}, score: {:7}, time: {:06.2f}, result: {:10.10}...'.format(initiator, bestScore, time, result[0])
         sys.stdout.flush()
 
     lock.release()
-
 
 def productFits(mask, product, xoffset, yoffset):
 
@@ -904,6 +903,11 @@ if __name__ == '__main__':
         thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_sv_rev_I"))
         threads += [thread]
         thread.start()
+
+
+    # An improvement would probably be, to erase really bad products. Such like a product that gives more negative values, than the fillingStuff together.
+    # Or experiment with like 2/3 of the most valuable products and include the worst 1/3 ones after. So the algorithm gets a little direction.
+
 
     for t in threads:
         t.join()
