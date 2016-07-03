@@ -907,7 +907,8 @@ if __name__ == '__main__':
 
     # An improvement would probably be, to erase really bad products. Such like a product that gives more negative values, than the fillingStuff together.
     # Or experiment with like 2/3 of the most valuable products and include the worst 1/3 ones after. So the algorithm gets a little direction.
-
+    #
+    # And restart the random threads, when anything finishes! So there is at least a random chance, it hits something good...
 
     for t in threads:
         t.join()
