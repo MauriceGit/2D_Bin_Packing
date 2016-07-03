@@ -8,6 +8,7 @@ from random import shuffle
 import math
 
 import collections
+import copy
 
 # Best global score
 bestScore = -9999999999999999999999999999999999
@@ -507,8 +508,79 @@ def createNewCCOAs(ccoaList, bestCCOA, products, mask, bag, placedProducts):
 # If all rectangles are successfully placed, CalcA0() returnes C (success).
 #
 # For a start: bag has to be empty!
-def calcA0(bag, products):
+def calcA0(mask, bag, ccoaList, products, placedProducts):
 
+    #
+    # Might it be possible, to calculate the best CCOA not just in the current bag, but overall?
+    # So get calculate the highest ccoa over all possible bags. And then put the best one at its best position.
+    # Next iteration calculate a little more (*bagCount) and put products even better?
+    # I'll go at it after implementing A1. Maybe it is not possible any more...
+    #
+    while ccoaList:
+        bestCCOA = recalculateDegrees(ccoaList, placedProducts, products, bag)
+        placeX = bestCCOA.pos[0] if bestCCOA.cornerType[0] > 0 else bestCCOA.pos[0]-products[bestCCOA.pIndex][0]+1
+        placeY = bestCCOA.pos[1] if bestCCOA.cornerType[1] > 0 else bestCCOA.pos[1]-products[bestCCOA.pIndex][1]+1
+
+        productToMask(mask, products[bestCCOA.pIndex], placeX, placeY)
+        removeAllInvalidCCOAs(ccoaList, bestCCOA, products, mask, bag)
+        p = products[bestCCOA.pIndex]
+        # pr2 == (x, y, width, height, value, index)
+        placedProduct = (bestCCOA.pos[0], bestCCOA.pos[1], p.width, p.height, p.value, p.pIndex)
+        placedProducts.append(placedProduct)
+        products[bestCCOA.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
+        createNewCCOAs(ccoaList, bestCCOA, products, mask, bag, placedProducts)
+
+    # All products are successfully placed!
+    return len(products) == len(placedProducts)
+    #return maskToList(mask, bag[0], bag[1], products, fillCosts), mask
+
+def calcDensity(mask, bag):
+
+    count = bag[0]*bag[1]
+    setCount = 0
+    for y in range(bag[1]):
+        for x in range(bag[0]):
+            if mask[y][x] != -1:
+                setCount += 1
+
+    return setCount / float(count)
+
+
+
+#
+#
+#
+def benefitA1(ccoa, mask, bag, ccoaList, products, placedProducts):
+    maskCopy = copy.deepcopy(mask)
+    ccoaListCopy = copy.deepcopy(ccoaList)
+    productsCopy = copy.deepcopy(products)
+    placedProductsCopy = copy.deepcopy(placedProducts)
+
+    placeX = ccoa.pos[0] if ccoa.cornerType[0] > 0 else ccoa.pos[0]-productsCopy[ccoa.pIndex][0]+1
+    placeY = ccoa.pos[1] if ccoa.cornerType[1] > 0 else ccoa.pos[1]-productsCopy[ccoa.pIndex][1]+1
+
+    # Modify C by placing rectangle i at (x, y), and modify L;
+    productToMask(maskCopy, productsCopy[ccoa.pIndex], placeX, placeY)
+    removeAllInvalidCCOAs(ccoaListCopy, ccoa, productsCopy, maskCopy, bag)
+    p = productsCopy[ccoa.pIndex]
+    # pr2 == (x, y, width, height, value, index)
+    placedProduct = (ccoa.pos[0], ccoa.pos[1], p.width, p.height, p.value, p.pIndex)
+    placedProductsCopy.append(placedProduct)
+    productsCopy[ccoa.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
+    createNewCCOAs(ccoaListCopy, ccoa, productsCopy, maskCopy, bag, placedProductsCopy)
+
+    success = calcA0(maskCopy, bag, ccoaListCopy, productsCopy, placedProductsCopy)
+
+    _, resultValue = maskToList(maskCopy, bag[0], bag[1], productsCopy, fillCosts)
+
+    density = calcDensity(maskCopy, bag)
+
+    return resultValue, success
+    #return density, success
+
+def calcA1(bag, products, fillCosts):
+
+    # Generate Configuraton
     mask = createMask(bag)
     ccoaList = []
     placedProducts = []
@@ -518,7 +590,7 @@ def calcA0(bag, products):
     corners.append( Corner(pos=(0,bag[1]-1), cornerType=(1,-1)) )
 
     bestCCOA = None
-
+    # Generate CCOAs
     for p in products:
         if not p.isPlaced:
             for c in corners:
@@ -535,9 +607,20 @@ def calcA0(bag, products):
                         if products[ccoa.pIndex].value > products[bestCCOA.pIndex].value:
                             bestCCOA = ccoa
 
-
-
     while ccoaList:
+        maxBenefit = -1000000000000
+        bestCCOA = None
+        finished = False
+
+        for ccoa in ccoaList:
+            benefit, success = benefitA1(ccoa, mask, bag, ccoaList, products, placedProducts)
+            finished = success
+            if finished or not bestCCOA or benefit > maxBenefit:
+                maxBenefit = benefit
+                bestCCOA = ccoa
+            if finished:
+                break
+
         placeX = bestCCOA.pos[0] if bestCCOA.cornerType[0] > 0 else bestCCOA.pos[0]-products[bestCCOA.pIndex][0]+1
         placeY = bestCCOA.pos[1] if bestCCOA.cornerType[1] > 0 else bestCCOA.pos[1]-products[bestCCOA.pIndex][1]+1
 
@@ -549,24 +632,22 @@ def calcA0(bag, products):
         placedProducts.append(placedProduct)
         products[bestCCOA.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
         createNewCCOAs(ccoaList, bestCCOA, products, mask, bag, placedProducts)
-        bestCCOA = recalculateDegrees(ccoaList, placedProducts, products, bag)
 
+        if finished:
+            success = calcA0(mask, bag, ccoaList, products, placedProducts)
+            break
 
     return maskToList(mask, bag[0], bag[1], products, fillCosts), mask
 
-
-
-def runA0(bags, namedProducts, lock, fillCosts):
+def runA1(bags, namedProducts, lock, fillCosts):
 
     resultList = [[] for x in range(len(bags))]
     resultValue = 0
 
-    #shuffle(bags)
-
     masks = []
 
     for bag in bags:
-        entry = calcA0(bag, namedProducts)
+        entry = calcA1(bag, namedProducts, fillCosts)
         res, value, mask = entry[0][0], entry[0][1], entry[1]
         # put the calculated bag to the right position (just like they came in originally!)
         resultList[bag[2]] = res
@@ -604,7 +685,7 @@ if __name__ == '__main__':
         namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=p[3], isPlaced=False))
 
     for i in range(1):
-        runA0(list(bags), list(namedProducts), lock, fillCosts)
+        runA1(list(bags), list(namedProducts), lock, fillCosts)
 
     if False:
         for i in range(10):
