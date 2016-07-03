@@ -241,9 +241,10 @@ def calcGreedyFilling(lock, algorithm, bags, products, fillCosts):
 #### A two-level search algorithm for 2D rectangular packing problem ###
 ########################################################################
 
-CCOA = collections.namedtuple('CCOA', 'pos cornerType pIndex degree')
-Corner = collections.namedtuple('Corner', 'pos cornerType')
+CCOA    = collections.namedtuple('CCOA', 'pos cornerType pIndex degree')
+Corner  = collections.namedtuple('Corner', 'bag pos cornerType')
 Product = collections.namedtuple('Product', 'width height value pIndex isPlaced')
+Unit    = collections.namedtuple('Unit', 'bag mask placedProducts')
 
 # Distance between two points
 def d(p1, p2):
@@ -366,10 +367,9 @@ def recalculateDegrees(ccoaList, placedProducts, products, bag):
     return bestCCOA
 
 
-
 # Check inside the mask if the product does not overlap with some other product.
 # Then create a CCOA.
-def createCCOA(corner, product, mask, placedProducts, bag):
+def createCCOA(corner, product, unit):
 
     # Iterate the outline of the product on the mask on the corner-position.
     # If it hits something, return None. Otherwise create a SSOA.
@@ -377,13 +377,13 @@ def createCCOA(corner, product, mask, placedProducts, bag):
     placeX = corner.pos[0] if corner.cornerType[0] > 0 else corner.pos[0]-product[0]+1
     placeY = corner.pos[1] if corner.cornerType[1] > 0 else corner.pos[1]-product[1]+1
 
-    if productFitsFast(mask, product, placeX, placeY, bag):
-        pDegree = calcDegree(corner.pos[0], corner.pos[1], corner.cornerType, product, placedProducts, bag)
+    if productFitsFast(unit.mask, product, placeX, placeY, unit.bag):
+        pDegree = calcDegree(corner.pos[0], corner.pos[1], corner.cornerType, product, unit.placedProducts, unit.bag)
         return CCOA(pos=corner.pos, cornerType=corner.cornerType, pIndex=product[3], degree=pDegree)
     else:
         return None
 
-def removeAllInvalidCCOAs(ccoas, placedccoa, products, mask, bag):
+def removeAllInvalidCCOAs(ccoas, placedccoa, products, unit):
     toDelete = []
     for i in range(len(ccoas)):
         ccoa = ccoas[i]
@@ -394,7 +394,7 @@ def removeAllInvalidCCOAs(ccoas, placedccoa, products, mask, bag):
         placeX = ccoa.pos[0] if ccoa.cornerType[0] > 0 else ccoa.pos[0]-products[ccoa.pIndex][0]+1
         placeY = ccoa.pos[1] if ccoa.cornerType[1] > 0 else ccoa.pos[1]-products[ccoa.pIndex][1]+1
 
-        if not productFitsFast(mask, products[ccoa.pIndex], placeX, placeY, bag):
+        if not productFitsFast(unit.mask, products[ccoa.pIndex], placeX, placeY, unit.bag):
             toDelete.append(i)
 
     toDelete = sorted(toDelete, reverse=True)
@@ -435,7 +435,7 @@ def countNeighbours(bag, mask, x, y):
 
     return count, tuple(corner)
 
-def createNewCCOAs(ccoaList, bestCCOA, products, mask, bag, placedProducts):
+def createNewCCOAs(ccoaList, bestCCOA, products, unit):
     #xoffset = bestCCOA.pos[0]-1
     #yoffset = bestCCOA.pos[1]-1
 
@@ -446,46 +446,46 @@ def createNewCCOAs(ccoaList, bestCCOA, products, mask, bag, placedProducts):
     sizeY = products[bestCCOA.pIndex][1]+2
 
     for y in range(yoffset, yoffset+sizeY):
-        if y >= 0 and y < bag[1] and xoffset > 0:
-            count, cType = countNeighbours(bag, mask, xoffset, y)
-            corner = Corner(pos=(xoffset,y), cornerType=cType)
+        if y >= 0 and y < unit.bag[1] and xoffset > 0:
+            count, cType = countNeighbours(unit.bag, unit.mask, xoffset, y)
+            corner = Corner(bag=unit.bag, pos=(xoffset,y), cornerType=cType)
             if count >= 2:
                 for p in products:
                     if not p.isPlaced:
-                        newccoa = createCCOA(corner, p, mask, placedProducts, bag)
+                        newccoa = createCCOA(corner, p, unit)
                         if newccoa:
                             ccoaList.append(newccoa)
 
     for y in range(yoffset, yoffset+sizeY):
-        if y >= 0 and y < bag[1] and xoffset+sizeX-1 < bag[0]:
-            count, cType = countNeighbours(bag, mask, xoffset+sizeX-1, y)
-            corner = Corner(pos=(xoffset+sizeX-1,y), cornerType=cType)
+        if y >= 0 and y < unit.bag[1] and xoffset+sizeX-1 < unit.bag[0]:
+            count, cType = countNeighbours(unit.bag, unit.mask, xoffset+sizeX-1, y)
+            corner = Corner(bag=unit.bag, pos=(xoffset+sizeX-1,y), cornerType=cType)
             if count >= 2:
                 for p in products:
                     if not p.isPlaced:
-                        newccoa = createCCOA(corner, p, mask, placedProducts, bag)
+                        newccoa = createCCOA(corner, p, unit)
                         if newccoa:
                             ccoaList.append(newccoa)
 
     for x in range(xoffset, xoffset+sizeX):
-        if x >= 0 and x < bag[0] and yoffset > 0:
-            count, cType = countNeighbours(bag, mask, x, yoffset)
-            corner = Corner(pos=(x,yoffset), cornerType=cType)
+        if x >= 0 and x < unit.bag[0] and yoffset > 0:
+            count, cType = countNeighbours(unit.bag, unit.mask, x, yoffset)
+            corner = Corner(bag=unit.bag, pos=(x,yoffset), cornerType=cType)
             if count >= 2:
                 for p in products:
                     if not p.isPlaced:
-                        newccoa = createCCOA(corner, p, mask, placedProducts, bag)
+                        newccoa = createCCOA(corner, p, unit)
                         if newccoa:
                             ccoaList.append(newccoa)
 
     for x in range(xoffset, xoffset+sizeX):
-        if x >= 0 and x < bag[0] and yoffset+sizeY-1 < bag[1]:
-            count, cType = countNeighbours(bag, mask, x, yoffset+sizeY-1)
-            corner = Corner(pos=(x,yoffset+sizeY-1), cornerType=cType)
+        if x >= 0 and x < unit.bag[0] and yoffset+sizeY-1 < unit.bag[1]:
+            count, cType = countNeighbours(unit.bag, unit.mask, x, yoffset+sizeY-1)
+            corner = Corner(bag=unit.bag, pos=(x,yoffset+sizeY-1), cornerType=cType)
             if count >= 2:
                 for p in products:
                     if not p.isPlaced:
-                        newccoa = createCCOA(corner, p, mask, placedProducts, bag)
+                        newccoa = createCCOA(corner, p, unit)
                         if newccoa:
                             ccoaList.append(newccoa)
 
@@ -508,7 +508,7 @@ def createNewCCOAs(ccoaList, bestCCOA, products, mask, bag, placedProducts):
 # If all rectangles are successfully placed, CalcA0() returnes C (success).
 #
 # For a start: bag has to be empty!
-def calcA0(mask, bag, ccoaList, products, placedProducts):
+def calcA0(unit, ccoaList, products):
 
     #
     # Might it be possible, to calculate the best CCOA not just in the current bag, but overall?
@@ -517,21 +517,21 @@ def calcA0(mask, bag, ccoaList, products, placedProducts):
     # I'll go at it after implementing A1. Maybe it is not possible any more...
     #
     while ccoaList:
-        bestCCOA = recalculateDegrees(ccoaList, placedProducts, products, bag)
+        bestCCOA = recalculateDegrees(ccoaList, unit.placedProducts, products, unit.bag)
         placeX = bestCCOA.pos[0] if bestCCOA.cornerType[0] > 0 else bestCCOA.pos[0]-products[bestCCOA.pIndex][0]+1
         placeY = bestCCOA.pos[1] if bestCCOA.cornerType[1] > 0 else bestCCOA.pos[1]-products[bestCCOA.pIndex][1]+1
 
-        productToMask(mask, products[bestCCOA.pIndex], placeX, placeY)
-        removeAllInvalidCCOAs(ccoaList, bestCCOA, products, mask, bag)
+        productToMask(unit.mask, products[bestCCOA.pIndex], placeX, placeY)
+        removeAllInvalidCCOAs(ccoaList, bestCCOA, products, unit)
         p = products[bestCCOA.pIndex]
         # pr2 == (x, y, width, height, value, index)
         placedProduct = (bestCCOA.pos[0], bestCCOA.pos[1], p.width, p.height, p.value, p.pIndex)
-        placedProducts.append(placedProduct)
+        unit.placedProducts.append(placedProduct)
         products[bestCCOA.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
-        createNewCCOAs(ccoaList, bestCCOA, products, mask, bag, placedProducts)
+        createNewCCOAs(ccoaList, bestCCOA, products, unit)
 
     # All products are successfully placed!
-    return len(products) == len(placedProducts)
+    return len(products) == len(unit.placedProducts)
     #return maskToList(mask, bag[0], bag[1], products, fillCosts), mask
 
 def calcDensity(mask, bag):
@@ -546,55 +546,50 @@ def calcDensity(mask, bag):
     return setCount / float(count)
 
 
-
-#
-#
-#
-def benefitA1(ccoa, mask, bag, ccoaList, products, placedProducts):
-    maskCopy = copy.deepcopy(mask)
+def benefitA1(ccoa, unit, ccoaList, products):
+    maskCopy = copy.deepcopy(unit.mask)
     ccoaListCopy = copy.deepcopy(ccoaList)
     productsCopy = copy.deepcopy(products)
-    placedProductsCopy = copy.deepcopy(placedProducts)
+    placedProductsCopy = copy.deepcopy(unit.placedProducts)
+    unitCopy = Unit(mask=maskCopy, bag=unit.bag, placedProducts=placedProductsCopy)
 
     placeX = ccoa.pos[0] if ccoa.cornerType[0] > 0 else ccoa.pos[0]-productsCopy[ccoa.pIndex][0]+1
     placeY = ccoa.pos[1] if ccoa.cornerType[1] > 0 else ccoa.pos[1]-productsCopy[ccoa.pIndex][1]+1
 
     # Modify C by placing rectangle i at (x, y), and modify L;
     productToMask(maskCopy, productsCopy[ccoa.pIndex], placeX, placeY)
-    removeAllInvalidCCOAs(ccoaListCopy, ccoa, productsCopy, maskCopy, bag)
+    removeAllInvalidCCOAs(ccoaListCopy, ccoa, productsCopy, unitCopy)
     p = productsCopy[ccoa.pIndex]
     # pr2 == (x, y, width, height, value, index)
     placedProduct = (ccoa.pos[0], ccoa.pos[1], p.width, p.height, p.value, p.pIndex)
-    placedProductsCopy.append(placedProduct)
+    unitCopy.placedProducts.append(placedProduct)
     productsCopy[ccoa.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
-    createNewCCOAs(ccoaListCopy, ccoa, productsCopy, maskCopy, bag, placedProductsCopy)
+    createNewCCOAs(ccoaListCopy, ccoa, productsCopy, unitCopy)
 
-    success = calcA0(maskCopy, bag, ccoaListCopy, productsCopy, placedProductsCopy)
+    success = calcA0(unitCopy, ccoaListCopy, productsCopy)
 
-    _, resultValue = maskToList(maskCopy, bag[0], bag[1], productsCopy, fillCosts)
+    _, resultValue = maskToList(maskCopy, unitCopy.bag[0], unitCopy.bag[1], productsCopy, fillCosts)
 
-    density = calcDensity(maskCopy, bag)
+    density = calcDensity(maskCopy, unitCopy.bag)
 
     return resultValue, success
     #return density, success
 
-def calcA1(bag, products, fillCosts):
+def calcA1(unit, products, fillCosts):
 
     # Generate Configuraton
-    mask = createMask(bag)
     ccoaList = []
-    placedProducts = []
-    corners = [ Corner(pos=(0,0), cornerType=(1,1)) ]
-    corners.append( Corner(pos=(bag[0]-1,0), cornerType=(-1,1)) )
-    corners.append( Corner(pos=(bag[0]-1,bag[1]-1), cornerType=(-1,-1)) )
-    corners.append( Corner(pos=(0,bag[1]-1), cornerType=(1,-1)) )
+    corners = [     Corner(bag=unit.bag, pos=(0,0), cornerType=(1,1)) ]
+    corners.append( Corner(bag=unit.bag, pos=(unit.bag[0]-1,0), cornerType=(-1,1)) )
+    corners.append( Corner(bag=unit.bag, pos=(unit.bag[0]-1,unit.bag[1]-1), cornerType=(-1,-1)) )
+    corners.append( Corner(bag=unit.bag, pos=(0,unit.bag[1]-1), cornerType=(1,-1)) )
 
     bestCCOA = None
     # Generate CCOAs
     for p in products:
         if not p.isPlaced:
             for c in corners:
-                ccoa = createCCOA(c, p, mask, placedProducts, bag)
+                ccoa = createCCOA(c, p, unit)
                 if ccoa:
                     ccoaList.append(ccoa)
                     if not bestCCOA:
@@ -613,7 +608,7 @@ def calcA1(bag, products, fillCosts):
         finished = False
 
         for ccoa in ccoaList:
-            benefit, success = benefitA1(ccoa, mask, bag, ccoaList, products, placedProducts)
+            benefit, success = benefitA1(ccoa, unit, ccoaList, products)
             finished = success
             if finished or not bestCCOA or benefit > maxBenefit:
                 maxBenefit = benefit
@@ -624,20 +619,20 @@ def calcA1(bag, products, fillCosts):
         placeX = bestCCOA.pos[0] if bestCCOA.cornerType[0] > 0 else bestCCOA.pos[0]-products[bestCCOA.pIndex][0]+1
         placeY = bestCCOA.pos[1] if bestCCOA.cornerType[1] > 0 else bestCCOA.pos[1]-products[bestCCOA.pIndex][1]+1
 
-        productToMask(mask, products[bestCCOA.pIndex], placeX, placeY)
-        removeAllInvalidCCOAs(ccoaList, bestCCOA, products, mask, bag)
+        productToMask(unit.mask, products[bestCCOA.pIndex], placeX, placeY)
+        removeAllInvalidCCOAs(ccoaList, bestCCOA, products, unit)
         p = products[bestCCOA.pIndex]
         # pr2 == (x, y, width, height, value, index)
         placedProduct = (bestCCOA.pos[0], bestCCOA.pos[1], p.width, p.height, p.value, p.pIndex)
-        placedProducts.append(placedProduct)
+        unit.placedProducts.append(placedProduct)
         products[bestCCOA.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
-        createNewCCOAs(ccoaList, bestCCOA, products, mask, bag, placedProducts)
+        createNewCCOAs(ccoaList, bestCCOA, products, unit)
 
         if finished:
-            success = calcA0(mask, bag, ccoaList, products, placedProducts)
+            success = calcA0(unit, ccoaList, products)
             break
 
-    return maskToList(mask, bag[0], bag[1], products, fillCosts), mask
+    return maskToList(unit.mask, unit.bag[0], unit.bag[1], products, fillCosts)
 
 def runA1(bags, namedProducts, lock, fillCosts):
 
@@ -646,9 +641,12 @@ def runA1(bags, namedProducts, lock, fillCosts):
 
     masks = []
 
-    for bag in bags:
-        entry = calcA1(bag, namedProducts, fillCosts)
-        res, value, mask = entry[0][0], entry[0][1], entry[1]
+    for bIndex in range(len(bags)):
+        bag = bags[bIndex]
+        mask = createMask(bag)
+        placedProducts = []
+        unit = Unit(bag=bag, mask=mask, placedProducts=placedProducts)
+        res, value = calcA1(unit, namedProducts, fillCosts)
         # put the calculated bag to the right position (just like they came in originally!)
         resultList[bag[2]] = res
         resultValue += value
@@ -688,7 +686,7 @@ if __name__ == '__main__':
     threads += [thread]
     thread.start()
 
-    if True:
+    if False:
         for i in range(10):
             shuffle(products)
             shuffle(bags)
