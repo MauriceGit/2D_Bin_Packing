@@ -1,11 +1,10 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 # -*- coding: utf-8 -*-
 
 import sys
 
 from multiprocessing import Process, Lock, Value
 
-from thread import allocate_lock
 from random import shuffle
 import math
 
