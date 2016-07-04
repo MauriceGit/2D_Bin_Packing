@@ -22,7 +22,7 @@ def printResult(lock, result, initiator, time):
     if result[1] > bestScore:
         bestScore = result[1]
         #print "initiator: " % (initiator, bestScore, result[0])
-        print 'initiator: {:15}, score: {:7}, time: {:06.2f}, result: {:10.10}...'.format(initiator, bestScore, time, result[0])
+        print 'initiator: {:20}, score: {:7}, time: {:06.2f}, result: {:10.10}...'.format(initiator, bestScore, time, result[0])
         sys.stdout.flush()
 
     lock.release()
@@ -103,12 +103,7 @@ def countSurroundingBlocks(mask, width, height, x, y, product):
     return blockCount
 
 
-# Der hier ist eeetwas besser, aber nicht viel.
-# Hier amch ich prinzipiell das Gleiche, wie bei dem Dummen Algorithmus.
-# Mit dem Unterschied, dass ich versuche, dass mindestens 2 Seiten vollen Kontakt mit irgendwas haben.
-# Also eine Ecke zum Beispiel. Ja? Jupp
-# Und wenn ich zwei Seiten habe, return ich das.
-# Try to get at most outer blocks aligned with other blocks or the side
+# Try to get at most outer blocks aligned with other blocks or the side. So at least two sides are aligned to something!
 def placeProductInBagIntelligent(mask, width, height, product):
     productPlaced = False
     countY = 0
@@ -222,7 +217,7 @@ def fillBag(algorithm, bag, products, savedProducts, fillCosts):
     return maskToList(mask, bag[0], bag[1], savedProducts, fillCosts)
 
 
-def calcGreedyFilling(lock, algorithm, bags, products, fillCosts, initiator):
+def calcGreedyFilling(lock, algorithm, bags, products, fillCosts, initiator, verbose=False):
 
     start = time.time()
 
@@ -237,6 +232,8 @@ def calcGreedyFilling(lock, algorithm, bags, products, fillCosts, initiator):
         # put the calculated bag to the right position (just like they came in originally!)
         resultList[bag[2]] = res
         resultValue += value
+        if verbose:
+            printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
     printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
@@ -549,7 +546,7 @@ def calcDensity(mask, bag):
     return setCount / float(count)
 
 
-def benefitA1(ccoa, units, ccoaList, products):
+def benefitA1(ccoa, units, ccoaList, products, rateValue):
     maskCopy = copy.deepcopy(units[ccoa.unitIndex].mask)
     ccoaListCopy = copy.deepcopy(ccoaList)
     productsCopy = copy.deepcopy(products)
@@ -574,12 +571,12 @@ def benefitA1(ccoa, units, ccoaList, products):
 
     _, resultValue = maskToList(maskCopy, unitsCopy[ccoa.unitIndex].bag[0], unitsCopy[ccoa.unitIndex].bag[1], productsCopy, fillCosts)
 
-    density = calcDensity(maskCopy, unitsCopy[ccoa.unitIndex].bag)
+    if rateValue:
+        return resultValue
+    else:
+        return calcDensity(maskCopy, unitsCopy[ccoa.unitIndex].bag)
 
-    return resultValue
-    #return density
-
-def calcA1(units, products):
+def calcA1(units, products, rateValue):
 
     # Generate Configuraton
     ccoaList = []
@@ -616,7 +613,7 @@ def calcA1(units, products):
         finished = False
 
         for ccoa in ccoaList:
-            benefit = benefitA1(ccoa, units, ccoaList, products)
+            benefit = benefitA1(ccoa, units, ccoaList, products, rateValue)
 
             placedProductCount = 0
             for unit in units:
@@ -651,7 +648,7 @@ def calcA1(units, products):
 # As I see it, there is no real benefit from the 3-4 examples tested. But there might be later on (?!?)
 # This tries to optimise any product to any bag simultaneously.
 # To find THE perfect spot for any given product.
-def runA1Slow(bags, namedProducts, lock, fillCosts, initiator):
+def runA1Slow(bags, namedProducts, lock, fillCosts, initiator, rateValue):
     masks = []
     units = []
 
@@ -666,7 +663,7 @@ def runA1Slow(bags, namedProducts, lock, fillCosts, initiator):
 
         masks.append(mask)
 
-    calcA1(units, namedProducts)
+    calcA1(units, namedProducts, rateValue)
 
     resultList = [[] for x in range(len(bags))]
     resultValue = 0
@@ -684,7 +681,7 @@ def runA1Slow(bags, namedProducts, lock, fillCosts, initiator):
             ppMask(masks[i], bags[i])
             print "========================================================="
 
-def runA1Fast(bags, products, lock, fillCosts, initiator):
+def runA1Fast(bags, products, lock, fillCosts, initiator, rateValue):
 
     start = time.time()
 
@@ -700,7 +697,7 @@ def runA1Fast(bags, products, lock, fillCosts, initiator):
         unit = Unit(bag=bag, mask=mask, placedProducts=placedProducts)
         units = [unit]
 
-        calcA1(units, products)
+        calcA1(units, products, rateValue)
 
         l, v = maskToList(unit.mask, unit.bag[0], unit.bag[1], products, fillCosts)
 
@@ -839,32 +836,49 @@ if __name__ == '__main__':
     products = [products[i]+(i,) for i in range(len(products))]
     bags = [bags[i]+(i,) for i in range(len(bags))]
 
+
+
+
     namedProducts = []
-    for p in products:
-        namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=p[3], isPlaced=False))
+    for i in range(len(products)):
+        p = products[i]
+        products[i] = p+(i,)
+        namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=i, isPlaced=False))
 
     # A1 slow!
     if True:
-        thread = Thread(target=runA1Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Slow"))
-        threads += [thread]
+        thread = Thread(target=runA1Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Slow_Value", True))
+        threads.append(thread)
         thread.start()
 
     # A1 fast!
     if True:
-        thread = Thread(target=runA1Fast, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Fast"))
-        threads += [thread]
+        thread = Thread(target=runA1Fast, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Fast_Value", True))
+        threads.append(thread)
+        thread.start()
+
+    # A1 slow!
+    if True:
+        thread = Thread(target=runA1Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Slow_Density", False))
+        threads.append(thread)
+        thread.start()
+
+    # A1 fast!
+    if True:
+        thread = Thread(target=runA1Fast, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Fast_Density", False))
+        threads.append(thread)
         thread.start()
 
     # A0 slow!
     if True:
         thread = Thread(target=runA0Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A0_Slow"))
-        threads += [thread]
+        threads.append(thread)
         thread.start()
 
     # A0 fast!
     if True:
         thread = Thread(target=runA0Fast, args=(list(bags), list(namedProducts), lock, fillCosts, "A0_Fast"))
-        threads += [thread]
+        threads.append(thread)
         thread.start()
 
     if True:
@@ -872,38 +886,44 @@ if __name__ == '__main__':
             shuffle(products)
             shuffle(bags)
             thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "AllShuffled_I"))
-            threads += [thread]
+            threads.append(thread)
+            thread.start()
+
+        for i in range(5):
+            shuffle(products)
+            shuffle(bags)
+            thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "AllShuffled_I_V", True))
+            threads.append(thread)
             thread.start()
 
         products = sorted(products, key=lambda x: x[2], reverse=False)
         thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_v_I"))
-        threads += [thread]
+        threads.append(thread)
         thread.start()
 
         # Biggest values first
         products = sorted(products, key=lambda x: x[2], reverse=True)
         thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_v_rev_I"))
-        threads += [thread]
+        threads.append(thread)
         thread.start()
 
         # Biggest products first
         products = sorted(products, key=lambda x: x[0]*x[1], reverse=True)
         thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_s_rev_I"))
-        threads += [thread]
+        threads.append(thread)
         thread.start()
 
         # Biggest bags first
         bags = sorted(bags, key=lambda x: x[0]*x[1], reverse=True)
         thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "b_sort_s_rev_I"))
-        threads += [thread]
+        threads.append(thread)
         thread.start()
 
         # Biggest products combined with biggest values ???
         products = sorted(products, key=lambda x: x[0]*x[1] + 10*x[2], reverse=True)
-        thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_sv_rev_I"))
-        threads += [thread]
+        thread = Thread(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_sv_rev_I", True))
+        threads.append(thread)
         thread.start()
-
 
     # An improvement would probably be, to erase really bad products. Such like a product that gives more negative values, than the fillingStuff together.
     # Or experiment with like 2/3 of the most valuable products and include the worst 1/3 ones after. So the algorithm gets a little direction.
