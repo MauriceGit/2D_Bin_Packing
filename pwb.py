@@ -24,8 +24,11 @@ def printResult(lock, result, initiator, time):
     global bestScore
     if result[1] > bestScore.value:
         bestScore.value = result[1]
-        #print "initiator: " % (initiator, bestScore, result[0])
-        print 'initiator: {:20}, score: {:7}, time: {:06.2f}, result: {}...'.format(initiator, bestScore.value, time, result[0])
+
+        if False:
+            print 'initiator: {:20}, score: {:7}, time: {:06.2f}, result: {}...'.format(initiator, bestScore.value, time, result[0])
+        else:
+            print result[0]
         sys.stdout.flush()
 
     lock.release()
@@ -833,20 +836,9 @@ def runA0Fast(bags, products, lock, fillCosts, initiator, verbose):
     printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
 def infinitShuffle(products, bags, lock, fillCosts, initiator):
-    if True:
-        while True:
-            threads = []
-            for i in range(4):
-                shuffle(products)
-                shuffle(bags)
-                thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, initiator, True))
-                threads.append(thread)
-                thread.start()
-            for t in threads:
-                t.join()
-    else:
+    while True:
         threads = []
-        for i in range(10):
+        for i in range(4):
             shuffle(products)
             shuffle(bags)
             thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, initiator, True))
@@ -888,7 +880,6 @@ if __name__ == '__main__':
         p = products[i]
         products[i] = p+(i,)
         namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=i, isPlaced=False))
-
 
     if True:
         # A1 slow!
@@ -950,6 +941,8 @@ if __name__ == '__main__':
 
     # An improvement would probably be, to erase really bad products. Such like a product that gives more negative values, than the fillingStuff together.
     # Or experiment with like 2/3 of the most valuable products and include the worst 1/3 ones after. So the algorithm gets a little direction.
+
+    # And add too large products to a bag anyway, when it is not used in the end and wouldn't fit in a bag.
 
     for t in threads:
         t.join()
