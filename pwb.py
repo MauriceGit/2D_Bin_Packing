@@ -24,7 +24,7 @@ def printResult(lock, result, initiator, time):
     if result[1] > bestScore.value:
         bestScore.value = result[1]
 
-        if False:
+        if True:
             print 'initiator: {:20}, score: {:7}, time: {:06.2f}, result: {}...'.format(initiator, bestScore.value, time, result[0])
         else:
             print result[0]
@@ -231,14 +231,16 @@ def calcGreedyFilling(lock, algorithm, bags, products, fillCosts, initiator, ver
 
     savedProducts = sorted(list(products), key=lambda x: x[3])
 
-    for bag in bags:
+    for bIndex in range(len(bags)):
+        bag = bags[bIndex]
         res, value = fillBag(algorithm, bag, products, savedProducts, fillCosts)
         #print value
         # put the calculated bag to the right position (just like they came in originally!)
         resultList[bag[2]] = res
         resultValue += value
         if verbose:
-            printResult(lock, (resultList, resultValue), initiator, time.time()-start)
+            restValue = reduce(lambda x,y: x - y[0]*y[1]*fillCosts, bags[bIndex+1:], 0)
+            printResult(lock, (resultList, resultValue+restValue), initiator, time.time()-start)
 
     printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
@@ -556,7 +558,13 @@ def benefitA1(ccoa, units, ccoaList, products, rateValue):
     ccoaListCopy = copy.deepcopy(ccoaList)
     productsCopy = copy.deepcopy(products)
     #placedProductsCopy = copy.deepcopy(units[ccoa.unitIndex].placedProducts)
-    unitsCopy = copy.deepcopy(units)
+    #unitsCopy = copy.deepcopy(units)
+    unitsCopy = []
+    for u in units:
+        mCpy = copy.deepcopy(u.mask)
+        bCpy = copy.deepcopy(u.bag)
+        uCpy = copy.deepcopy(u.placedProducts)
+        unitsCopy.append(Unit(mask=mCpy, bag=bCpy, placedProducts=uCpy))
     #unitCopy = Unit(mask=maskCopy, bag=units[ccoa.unitIndex].bag, placedProducts=placedProductsCopy)
 
     placeX = ccoa.pos[0] if ccoa.cornerType[0] > 0 else ccoa.pos[0]-productsCopy[ccoa.pIndex][0]+1
@@ -581,7 +589,7 @@ def benefitA1(ccoa, units, ccoaList, products, rateValue):
     else:
         return calcDensity(maskCopy, unitsCopy[ccoa.unitIndex].bag)
 
-def calcA1(units, products, rateValue):
+def calcA1(units, products, rateValue, verbose, lock, initiator, startTime):
 
     # Generate Configuraton
     ccoaList = []
@@ -643,9 +651,28 @@ def calcA1(units, products, rateValue):
         products[bestCCOA.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
         createNewCCOAs(ccoaList, bestCCOA, products, units)
 
+        if verbose:
+            resultList = [[] for x in range(len(units))]
+            resultValue = 0
+            for i in range(len(units)):
+                unit = units[i]
+                l, v = maskToList(unit.mask, unit.bag[0], unit.bag[1], products, fillCosts)
+                resultList[i] = l
+                resultValue += v
+            printResult(lock, (resultList, resultValue), initiator, time.time()-startTime)
+
         if finished:
             calcA0(units, ccoaList, products)
-            break
+            if verbose:
+                resultList = [[] for x in range(len(units))]
+                resultValue = 0
+                for i in range(len(units)):
+                    unit = units[i]
+                    l, v = maskToList(unit.mask, unit.bag[0], unit.bag[1], products, fillCosts)
+                    resultList[i] = l
+                    resultValue += v
+                printResult(lock, (resultList, resultValue), initiator, time.time()-startTime)
+            return
 
     #return maskToList(unit.mask, unit.bag[0], unit.bag[1], products, fillCosts)
 
@@ -668,7 +695,7 @@ def runA1Slow(bags, namedProducts, lock, fillCosts, initiator, rateValue, verbos
 
         masks.append(mask)
 
-    calcA1(units, namedProducts, rateValue)
+    calcA1(units, namedProducts, rateValue, verbose, lock, initiator, start)
 
     resultList = [[] for x in range(len(bags))]
     resultValue = 0
@@ -677,16 +704,9 @@ def runA1Slow(bags, namedProducts, lock, fillCosts, initiator, rateValue, verbos
         l, v = maskToList(unit.mask, unit.bag[0], unit.bag[1], namedProducts, fillCosts)
         resultList[i] = l
         resultValue += v
-        if verbose:
-            printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
     printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
-    if False:
-        print "========================================================="
-        for i in range(len(masks)):
-            ppMask(masks[i], bags[i])
-            print "========================================================="
 
 def runA1Fast(bags, products, lock, fillCosts, initiator, rateValue, verbose):
 
@@ -704,7 +724,7 @@ def runA1Fast(bags, products, lock, fillCosts, initiator, rateValue, verbose):
         unit = Unit(bag=bag, mask=mask, placedProducts=placedProducts)
         units = [unit]
 
-        calcA1(units, products, rateValue)
+        calcA1(units, products, rateValue, False, lock, initiator, start)
 
         l, v = maskToList(unit.mask, unit.bag[0], unit.bag[1], products, fillCosts)
 
@@ -712,7 +732,8 @@ def runA1Fast(bags, products, lock, fillCosts, initiator, rateValue, verbose):
         resultValue += v
 
         if verbose:
-            printResult(lock, (resultList, resultValue), initiator, time.time()-start)
+            restValue = reduce(lambda x,y: x - y[0]*y[1]*fillCosts, bags[bIndex+1:], 0)
+            printResult(lock, (resultList, resultValue+restValue), initiator, time.time()-start)
 
     printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
@@ -771,8 +792,6 @@ def runA0Slow(bags, products, lock, fillCosts, initiator, verbose):
         l, v = maskToList(unit.mask, unit.bag[0], unit.bag[1], products, fillCosts)
         resultList[i] = l
         resultValue += v
-        if verbose:
-            printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
     printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
@@ -830,7 +849,8 @@ def runA0Fast(bags, products, lock, fillCosts, initiator, verbose):
         resultValue += v
 
         if verbose:
-            printResult(lock, (resultList, resultValue), initiator, time.time()-start)
+            restValue = reduce(lambda x,y: x - y[0]*y[1]*fillCosts, bags[bIndex+1:], 0)
+            printResult(lock, (resultList, resultValue+restValue), initiator, time.time()-start)
 
     printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
@@ -858,6 +878,14 @@ def infiniteA0Fast(bags, namedProducts, lock, fillCosts, initiator):
     for p in permutations:
         runA0Fast(list(p), list(namedProducts), lock, fillCosts, initiator, True)
 
+def allEmptyBags(bags, fillCosts, lock, initiator):
+    start = time.time()
+
+    resultList = [[] for x in range(len(bags))]
+    resultValue = reduce(lambda x,y: x - y[0]*y[1]*fillCosts, bags, 0)
+
+    printResult(lock, (resultList, resultValue), initiator, time.time()-start)
+
 if __name__ == '__main__':
 
     # [(width, height)]
@@ -879,6 +907,12 @@ if __name__ == '__main__':
         p = products[i]
         products[i] = p+(i,)
         namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=i, isPlaced=False))
+
+    if True:
+        # Print all empty lists
+        thread = Process(target=allEmptyBags, args=(list(bags), fillCosts, lock, "All_Empty"))
+        threads.append(thread)
+        thread.start()
 
     if True:
         # A1 slow!
