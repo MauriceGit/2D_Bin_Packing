@@ -22,7 +22,7 @@ def printResult(lock, result, initiator, time):
     if result[1] > bestScore:
         bestScore = result[1]
         #print "initiator: " % (initiator, bestScore, result[0])
-        print 'initiator: {:20}, score: {:7}, time: {:06.2f}, result: {:10.10}...'.format(initiator, bestScore, time, result[0])
+        print 'initiator: {:20}, score: {:7}, time: {:06.2f}, result: {}...'.format(initiator, bestScore, time, result[0])
         sys.stdout.flush()
 
     lock.release()
