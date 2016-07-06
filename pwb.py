@@ -859,13 +859,13 @@ def infinitShuffle(products, bags, lock, fillCosts, initiator, start):
 
 def infiniteA1Fast(bags, namedProducts, lock, fillCosts, initiator, start):
 
-    permutations = list(itertools.permutations(bags, len(bags)))
+    permutations = itertools.permutations(bags, len(bags))
     for p in permutations:
         runA1Fast(list(p), list(namedProducts), lock, fillCosts, initiator, True, True, start)
 
 def infiniteA0Fast(bags, namedProducts, lock, fillCosts, initiator, start):
 
-    permutations = list(itertools.permutations(bags, len(bags)))
+    permutations = itertools.permutations(bags, len(bags))
     for p in permutations:
         runA0Fast(list(p), list(namedProducts), lock, fillCosts, initiator, True, start)
 
@@ -913,6 +913,7 @@ if __name__ == '__main__':
         thread.start()
 
     if True:
+        #if len(bags) <= 10:
         # A1 slow!
         thread = Process(target=runA1Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Slow_Value", True, True, start))
         threads.append(thread)
@@ -923,15 +924,16 @@ if __name__ == '__main__':
         threads.append(thread)
         thread.start()
 
+        # A0 fast - Trying all possible bag-combinations!
+        thread = Process(target=infiniteA0Fast, args=(bags, namedProducts, lock, fillCosts, "A0_Fast", start))
+        threads.append(thread)
+        thread.start()
+
         # A0 slow!
         thread = Process(target=runA0Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A0_Slow", True, start))
         threads.append(thread)
         thread.start()
 
-        # A0 fast - Trying all possible bag-combinations!
-        thread = Process(target=infiniteA0Fast, args=(bags, namedProducts, lock, fillCosts, "A0_Fast", start))
-        threads.append(thread)
-        thread.start()
 
     if True:
         # Shuffles both bags and products forever
