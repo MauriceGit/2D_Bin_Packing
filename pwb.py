@@ -24,7 +24,7 @@ def printResult(lock, result, initiator, time):
     if result[1] > bestScore.value:
         bestScore.value = result[1]
 
-        if True:
+        if False:
             print 'initiator: {:20}, score: {:7}, time: {:06.2f}, result: {}...'.format(initiator, bestScore.value, time, result[0])
         else:
             print result[0]
@@ -222,9 +222,7 @@ def fillBag(algorithm, bag, products, savedProducts, fillCosts):
     return maskToList(mask, bag[0], bag[1], savedProducts, fillCosts)
 
 
-def calcGreedyFilling(lock, algorithm, bags, products, fillCosts, initiator, verbose=False):
-
-    start = time.time()
+def calcGreedyFilling(lock, algorithm, bags, products, fillCosts, initiator, verbose, start):
 
     resultList = [[] for x in range(len(bags))]
     resultValue = 0
@@ -680,11 +678,9 @@ def calcA1(units, products, rateValue, verbose, lock, initiator, startTime):
 # As I see it, there is no real benefit from the 3-4 examples tested. But there might be later on (?!?)
 # This tries to optimise any product to any bag simultaneously.
 # To find THE perfect spot for any given product.
-def runA1Slow(bags, namedProducts, lock, fillCosts, initiator, rateValue, verbose):
+def runA1Slow(bags, namedProducts, lock, fillCosts, initiator, rateValue, verbose, start):
     masks = []
     units = []
-
-    start = time.time()
 
     for bIndex in range(len(bags)):
         bag = bags[bIndex]
@@ -708,9 +704,7 @@ def runA1Slow(bags, namedProducts, lock, fillCosts, initiator, rateValue, verbos
     printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
 
-def runA1Fast(bags, products, lock, fillCosts, initiator, rateValue, verbose):
-
-    start = time.time()
+def runA1Fast(bags, products, lock, fillCosts, initiator, rateValue, verbose, start):
 
     resultList = [[] for x in range(len(bags))]
     resultValue = 0
@@ -743,8 +737,7 @@ def runA1Fast(bags, products, lock, fillCosts, initiator, rateValue, verbose):
 # product. So the product can be placed in any bag at any time. So all bags are
 # filled synchronously.
 #
-def runA0Slow(bags, products, lock, fillCosts, initiator, verbose):
-    start = time.time()
+def runA0Slow(bags, products, lock, fillCosts, initiator, verbose, start):
 
     units = []
 
@@ -800,9 +793,7 @@ def runA0Slow(bags, products, lock, fillCosts, initiator, verbose):
 # the given products! Very fast because the loop over the bags does not downgrade
 # the performance significantly.
 #
-def runA0Fast(bags, products, lock, fillCosts, initiator, verbose):
-
-    start = time.time()
+def runA0Fast(bags, products, lock, fillCosts, initiator, verbose, start):
 
     resultList = [[] for x in range(len(bags))]
     resultValue = 0
@@ -854,32 +845,31 @@ def runA0Fast(bags, products, lock, fillCosts, initiator, verbose):
 
     printResult(lock, (resultList, resultValue), initiator, time.time()-start)
 
-def infinitShuffle(products, bags, lock, fillCosts, initiator):
+def infinitShuffle(products, bags, lock, fillCosts, initiator, start):
     while True:
         threads = []
         for i in range(4):
             shuffle(products)
             shuffle(bags)
-            thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, initiator, True))
+            thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, initiator, True, start))
             threads.append(thread)
             thread.start()
         for t in threads:
             t.join()
 
-def infiniteA1Fast(bags, namedProducts, lock, fillCosts, initiator):
+def infiniteA1Fast(bags, namedProducts, lock, fillCosts, initiator, start):
 
     permutations = list(itertools.permutations(bags, len(bags)))
     for p in permutations:
-        runA1Fast(list(p), list(namedProducts), lock, fillCosts, initiator, True, True)
+        runA1Fast(list(p), list(namedProducts), lock, fillCosts, initiator, True, True, start)
 
-def infiniteA0Fast(bags, namedProducts, lock, fillCosts, initiator):
+def infiniteA0Fast(bags, namedProducts, lock, fillCosts, initiator, start):
 
     permutations = list(itertools.permutations(bags, len(bags)))
     for p in permutations:
-        runA0Fast(list(p), list(namedProducts), lock, fillCosts, initiator, True)
+        runA0Fast(list(p), list(namedProducts), lock, fillCosts, initiator, True, start)
 
-def allEmptyBags(bags, fillCosts, lock, initiator):
-    start = time.time()
+def allEmptyBags(bags, fillCosts, lock, initiator, start):
 
     resultList = [[] for x in range(len(bags))]
     resultValue = reduce(lambda x,y: x - y[0]*y[1]*fillCosts, bags, 0)
@@ -898,6 +888,8 @@ if __name__ == '__main__':
     lock = Lock()
     threads = []
 
+    start = time.time()
+
     # append index of the product to the tuple!
     products = [products[i]+(i,) for i in range(len(products))]
     bags = [bags[i]+(i,) for i in range(len(bags))]
@@ -906,76 +898,77 @@ if __name__ == '__main__':
     for i in range(len(products)):
         p = products[i]
         products[i] = p+(i,)
-        namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=i, isPlaced=False))
+
+        # Filter products out, if the value is worse than just fillCosts
+        placed = False
+        if p[2] <= p[0]*p[1]*-fillCosts:
+            placed = True
+
+        namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=i, isPlaced=placed))
 
     if True:
         # Print all empty lists
-        thread = Process(target=allEmptyBags, args=(list(bags), fillCosts, lock, "All_Empty"))
+        thread = Process(target=allEmptyBags, args=(list(bags), fillCosts, lock, "All_Empty", start))
         threads.append(thread)
         thread.start()
 
     if True:
         # A1 slow!
-        thread = Process(target=runA1Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Slow_Value", True, True))
+        thread = Process(target=runA1Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Slow_Value", True, True, start))
         threads.append(thread)
         thread.start()
 
         # A1 fast - Trying all possible bag-combinations!
-        thread = Process(target=infiniteA1Fast, args=(bags, namedProducts, lock, fillCosts, "A1_Fast_Value"))
+        thread = Process(target=infiniteA1Fast, args=(bags, namedProducts, lock, fillCosts, "A1_Fast_Value", start))
         threads.append(thread)
         thread.start()
 
         # A0 slow!
-        thread = Process(target=runA0Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A0_Slow", True))
+        thread = Process(target=runA0Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A0_Slow", True, start))
         threads.append(thread)
         thread.start()
 
         # A0 fast - Trying all possible bag-combinations!
-        thread = Process(target=infiniteA0Fast, args=(bags, namedProducts, lock, fillCosts, "A0_Fast"))
+        thread = Process(target=infiniteA0Fast, args=(bags, namedProducts, lock, fillCosts, "A0_Fast", start))
         threads.append(thread)
         thread.start()
 
     if True:
         # Shuffles both bags and products forever
-        thread = Process(target=infinitShuffle, args=(list(products), list(bags), lock, fillCosts, "Infinite_Shuffle"))
+        thread = Process(target=infinitShuffle, args=(list(products), list(bags), lock, fillCosts, "Infinite_Shuffle", start))
         threads.append(thread)
         thread.start()
 
         # Smallest values first
         products = sorted(products, key=lambda x: x[2], reverse=False)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_v_I", True))
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_v_I", True, start))
         threads.append(thread)
         thread.start()
 
         # Biggest values first
         products = sorted(products, key=lambda x: x[2], reverse=True)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_v_rev_I", True))
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_v_rev_I", True, start))
         threads.append(thread)
         thread.start()
 
         # Biggest products first
         products = sorted(products, key=lambda x: x[0]*x[1], reverse=True)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_s_rev_I", True))
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_s_rev_I", True, start))
         threads.append(thread)
         thread.start()
 
         # Biggest bags first
         bags = sorted(bags, key=lambda x: x[0]*x[1], reverse=True)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "b_sort_s_rev_I", True))
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "b_sort_s_rev_I", True, start))
         threads.append(thread)
         thread.start()
 
         for rate in range(1, 100, 5):
             # Biggest products combined with biggest values ???
             products = sorted(products, key=lambda x: x[0]*x[1] + rate*x[2], reverse=True)
-            thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_sv_rev_I", True))
+            thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_sv_rev_I", True, start))
             threads.append(thread)
             thread.start()
-
-    # An improvement would probably be, to erase really bad products. Such like a product that gives more negative values, than the fillingStuff together.
-    # Or experiment with like 2/3 of the most valuable products and include the worst 1/3 ones after. So the algorithm gets a little direction.
-
-    # And add too large products to a bag anyway, when it is not used in the end and wouldn't fit in a bag.
 
     for t in threads:
         t.join()
