@@ -34,8 +34,8 @@ def printResult(lock, result, initiator, time):
 
 def productFits(mask, product, xoffset, yoffset):
 
-    for y in range(yoffset, yoffset+product[1]):
-        for x in range(xoffset, xoffset+product[0]):
+    for y in range(yoffset, yoffset+product.height):
+        for x in range(xoffset, xoffset+product.width):
             if mask[y][x] != -1:
                 return False
     return True
@@ -43,37 +43,42 @@ def productFits(mask, product, xoffset, yoffset):
 # Only check the outline and not all inside.
 def productFitsFast(mask, product, xoffset, yoffset, bag):
 
-    for y in range(yoffset, yoffset+product[1]):
+    for y in range(yoffset, yoffset+product.height):
         if y >= 0 and y < bag[1] and xoffset >= 0 and xoffset < bag[0]:
             if mask[y][xoffset] != -1:
                 return False
         else:
             return False
-    for y in range(yoffset, yoffset+product[1]):
-        if y >= 0 and y < bag[1] and xoffset+product[0]-1 >= 0 and xoffset+product[0]-1 < bag[0]:
-            if mask[y][xoffset+product[0]-1] != -1:
+    for y in range(yoffset, yoffset+product.height):
+        if y >= 0 and y < bag[1] and xoffset+product.width-1 >= 0 and xoffset+product.width-1 < bag[0]:
+            if mask[y][xoffset+product.width-1] != -1:
                 return False
         else:
             return False
 
-    for x in range(xoffset, xoffset+product[0]):
+    for x in range(xoffset, xoffset+product.width):
         if yoffset >= 0 and yoffset < bag[1] and x >= 0 and x < bag[0]:
             if mask[yoffset][x] != -1:
                 return False
         else:
             return False
-    for x in range(xoffset, xoffset+product[0]):
-        if yoffset+product[1]-1 >= 0 and yoffset+product[1]-1 < bag[1] and x >= 0 and x < bag[0]:
-            if mask[yoffset+product[1]-1][x] != -1:
+    for x in range(xoffset, xoffset+product.width):
+        if yoffset+product.height-1 >= 0 and yoffset+product.height-1 < bag[1] and x >= 0 and x < bag[0]:
+            if mask[yoffset+product.height-1][x] != -1:
                 return False
         else:
             return False
     return True
 
 def productToMask(mask, product, xoffset, yoffset):
-    for y in range(yoffset, yoffset+product[1]):
-        for x in range(xoffset, xoffset+product[0]):
-            mask[y][x] = product[3]
+    for y in range(yoffset, yoffset+product.height):
+        for x in range(xoffset, xoffset+product.width):
+            try:
+                mask[y][x] = product.pIndex
+            except:
+                print "ERROR:", y, x, product
+                print "mask:", len(mask[0]),len(mask)
+                exit(1)
 
 def countFreeBlocks(mask, x1, y1, x2, y2):
     freeBlockCount = 0
@@ -86,24 +91,24 @@ def countFreeBlocks(mask, x1, y1, x2, y2):
 def countSurroundingBlocks(mask, width, height, x, y, product):
     blockCount = 0
     if x == 0:
-        blockCount += product[1]
+        blockCount += product.height
     else:
-        blockCount += countFreeBlocks(mask, x-1, y, x, y+product[1])
+        blockCount += countFreeBlocks(mask, x-1, y, x, y+product.height)
 
-    if x+product[0] == width:
-        blockCount += product[1]
+    if x+product.width == width:
+        blockCount += product.height
     else:
-        blockCount += countFreeBlocks(mask, x+product[0], y, x+product[0]+1, y+product[1])
+        blockCount += countFreeBlocks(mask, x+product.width, y, x+product.width+1, y+product.height)
 
     if y == 0:
-        blockCount += product[0]
+        blockCount += product.width
     else:
-        blockCount += countFreeBlocks(mask, x, y-1, x+product[0], y)
+        blockCount += countFreeBlocks(mask, x, y-1, x+product.width, y)
 
-    if y+product[1] == height:
-        blockCount += product[0]
+    if y+product.height == height:
+        blockCount += product.width
     else:
-        blockCount += countFreeBlocks(mask, x, y+product[1], x+product[0], y+product[1]+1)
+        blockCount += countFreeBlocks(mask, x, y+product.height, x+product.width, y+product.height+1)
 
     return blockCount
 
@@ -115,11 +120,11 @@ def placeProductInBagIntelligent(mask, width, height, product):
     countX = 0
     # (x, y, surroundingBlockCount)
     bestPosition = (-1, -1, -1)
-    bestScore = product[0] + product[1]
+    bestScore = product.width + product.height
 
-    for y in range(countY, height-product[1]+1):
+    for y in range(countY, height-product.height+1):
         countX = 0
-        for x in range(countX, width-product[0]+1):
+        for x in range(countX, width-product.width+1):
             if productFits(mask, product, countX, countY):
                 blockCount = countSurroundingBlocks(mask, width, height, countX, countY, product)
                 if blockCount == bestScore:
@@ -145,9 +150,9 @@ def placeProductInBagDumb(mask, width, height, product):
     countY = 0
     countX = 0
 
-    for y in range(countY, height-product[1]+1):
+    for y in range(countY, height-product.height+1):
         countX = 0
-        for x in range(countX, width-product[0]+1):
+        for x in range(countX, width-product.width+1):
             if productFits(mask, product, countX, countY):
                 productToMask(mask, product, countX, countY)
                 return True
@@ -172,7 +177,7 @@ def maskToList(mask, width, height, products, fillCosts):
 
             if not mask[y][x] in alreadyFound:
                 alreadyFound.append(mask[y][x])
-                resultList.append((x,y,mask[y][x]))
+                resultList.append((x,y,products[mask[y][x]].realIndex))
                 resultValue += products[mask[y][x]][2]
 
     return resultList, resultValue
@@ -249,7 +254,7 @@ def calcGreedyFilling(lock, algorithm, bags, products, fillCosts, initiator, ver
 
 CCOA    = collections.namedtuple('CCOA', 'unitIndex pos cornerType pIndex degree')
 Corner  = collections.namedtuple('Corner', 'unitIndex pos cornerType')
-Product = collections.namedtuple('Product', 'width height value pIndex isPlaced')
+Product = collections.namedtuple('Product', 'width height value pIndex isPlaced realIndex')
 Unit    = collections.namedtuple('Unit', 'bag mask placedProducts')
 
 # Distance between two points
@@ -289,13 +294,13 @@ def minDistance(x, y, p, cornerType, pr2):
 
 # Minimum distance to the two relevant sides of the bag.
 def minDistanceToSides(x, y, cornerType, product, bag):
-    xDiff = x-product[0]
-    yDiff = y-product[1]+1
+    xDiff = x-product.width
+    yDiff = y-product.height+1
 
     if cornerType[0] > 0:
-        xDiff = bag[0] - (x+product[0])
+        xDiff = bag[0] - (x+product.width)
     if cornerType[1] > 0:
-        yDiff = bag[1] - (y+product[1])
+        yDiff = bag[1] - (y+product.height)
 
     return min(xDiff, yDiff)
 
@@ -309,12 +314,12 @@ def productInRange(x, y, cornerType, product, placedProduct):
     if cornerType[0] > 0:
         inRange = inRange and reduce(lambda a,b: a or b[0] > x, points, False)
     else:
-        inRange = inRange and reduce(lambda a,b: a or b[0] < x+product[0], points, False)
+        inRange = inRange and reduce(lambda a,b: a or b[0] < x+product.width, points, False)
 
     if cornerType[1] > 0:
         inRange = inRange and reduce(lambda a,b: a or b[1] > y, points, False)
     else:
-        inRange = inRange and reduce(lambda a,b: a or b[1] < y+product[1], points, False)
+        inRange = inRange and reduce(lambda a,b: a or b[1] < y+product.height, points, False)
 
     return inRange
 
@@ -341,7 +346,7 @@ def calcDegree(x,y,cornerType,product, placedProducts, bag):
     minDistSide = minDistanceToSides(x, y, cornerType, product, bag)
     minDistProd = minDistanceToProducts(x, y, cornerType, product, placedProducts, bag)
     globalMin   = min(minDistSide, minDistProd)
-    return 1.0 - globalMin / ((product[0]+product[1])/2.0)
+    return 1.0 - globalMin / ((product.width+product.height)/2.0)
 
 
 def recalculateDegrees(ccoaList, products, units):
@@ -382,8 +387,8 @@ def createCCOA(corner, product, units):
     # Iterate the outline of the product on the mask on the corner-position.
     # If it hits something, return None. Otherwise create a SSOA.
 
-    placeX = corner.pos[0] if corner.cornerType[0] > 0 else corner.pos[0]-product[0]+1
-    placeY = corner.pos[1] if corner.cornerType[1] > 0 else corner.pos[1]-product[1]+1
+    placeX = corner.pos[0] if corner.cornerType[0] > 0 else corner.pos[0]-product.width+1
+    placeY = corner.pos[1] if corner.cornerType[1] > 0 else corner.pos[1]-product.height+1
 
     if productFitsFast(units[corner.unitIndex].mask, product, placeX, placeY, units[corner.unitIndex].bag):
         pDegree = calcDegree(corner.pos[0], corner.pos[1], corner.cornerType, product, units[corner.unitIndex].placedProducts, units[corner.unitIndex].bag)
@@ -536,7 +541,7 @@ def calcA0(units, ccoaList, products):
         # pr2 == (x, y, width, height, value, index)
         placedProduct = (bestCCOA.pos[0], bestCCOA.pos[1], p.width, p.height, p.value, p.pIndex)
         units[bestCCOA.unitIndex].placedProducts.append(placedProduct)
-        products[bestCCOA.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
+        products[bestCCOA.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True, realIndex=p.realIndex)
         createNewCCOAs(ccoaList, bestCCOA, products, units)
 
 def calcDensity(mask, bag):
@@ -575,7 +580,7 @@ def benefitA1(ccoa, units, ccoaList, products, rateValue):
     # pr2 == (x, y, width, height, value, index)
     placedProduct = (ccoa.pos[0], ccoa.pos[1], p.width, p.height, p.value, p.pIndex)
     unitsCopy[ccoa.unitIndex].placedProducts.append(placedProduct)
-    productsCopy[ccoa.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
+    productsCopy[ccoa.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True, realIndex=p.realIndex)
     createNewCCOAs(ccoaListCopy, ccoa, productsCopy, unitsCopy)
 
     calcA0(unitsCopy, ccoaListCopy, productsCopy)
@@ -646,7 +651,7 @@ def calcA1(units, products, rateValue, verbose, lock, initiator, startTime):
         # pr2 == (x, y, width, height, value, index)
         placedProduct = (bestCCOA.pos[0], bestCCOA.pos[1], p.width, p.height, p.value, p.pIndex)
         units[bestCCOA.unitIndex].placedProducts.append(placedProduct)
-        products[bestCCOA.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True)
+        products[bestCCOA.pIndex] = Product(width=p.width, height=p.height, value=p.value, pIndex=p.pIndex, isPlaced=True, realIndex=p.realIndex)
         createNewCCOAs(ccoaList, bestCCOA, products, units)
 
         if verbose:
@@ -867,7 +872,15 @@ def infiniteA0Fast(bags, namedProducts, lock, fillCosts, initiator, start):
 
     permutations = itertools.permutations(bags, len(bags))
     for p in permutations:
-        runA0Fast(list(p), list(namedProducts), lock, fillCosts, initiator, True, start)
+        for rate in range(1, 20, 3):
+            # Biggest products combined with biggest values !
+            tmpProducts = sorted(namedProducts, key=lambda x: x.width*x.height + rate*x.value, reverse=True)
+
+            for i in range(len(tmpProducts)):
+                tmpP = tmpProducts[i]
+                tmpProducts[i] = Product(width=tmpP.width, height=tmpP.height, value=tmpP.value, pIndex=i, isPlaced=tmpP.isPlaced, realIndex=tmpP.realIndex)
+
+            runA0Fast(list(p), tmpProducts, lock, fillCosts, initiator, True, start)
 
 def allEmptyBags(bags, fillCosts, lock, initiator, start):
 
@@ -904,7 +917,7 @@ if __name__ == '__main__':
         if p[2] <= p[0]*p[1]*-fillCosts:
             placed = True
 
-        namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=i, isPlaced=placed))
+        namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=i, isPlaced=placed, realIndex=i))
 
     if True:
         # Print all empty lists
@@ -913,7 +926,6 @@ if __name__ == '__main__':
         thread.start()
 
     if True:
-        #if len(bags) <= 10:
         # A1 slow!
         thread = Process(target=runA1Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Slow_Value", True, True, start))
         threads.append(thread)
@@ -924,51 +936,58 @@ if __name__ == '__main__':
         threads.append(thread)
         thread.start()
 
-        # A0 fast - Trying all possible bag-combinations!
-        thread = Process(target=infiniteA0Fast, args=(bags, namedProducts, lock, fillCosts, "A0_Fast", start))
-        threads.append(thread)
-        thread.start()
-
         # A0 slow!
-        thread = Process(target=runA0Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A0_Slow", True, start))
+        # Biggest products combined with biggest values !
+        for rate in range(0, 20, 5):
+            tmpProducts = sorted(namedProducts, key=lambda x: x.width*x.height + rate*x.value, reverse=True)
+
+            for i in range(len(tmpProducts)):
+                tmpP = tmpProducts[i]
+                tmpProducts[i] = Product(width=tmpP.width, height=tmpP.height, value=tmpP.value, pIndex=i, isPlaced=tmpP.isPlaced, realIndex=tmpP.realIndex)
+
+            thread = Process(target=runA0Slow, args=(list(bags), list(tmpProducts), lock, fillCosts, "A0_Slow", True, start))
+            threads.append(thread)
+            thread.start()
+
+        # A0 fast - Trying all possible bag-combinations!
+        thread = Process(target=infiniteA0Fast, args=(bags, list(namedProducts), lock, fillCosts, "A0_Fast", start))
         threads.append(thread)
         thread.start()
-
 
     if True:
         # Shuffles both bags and products forever
-        thread = Process(target=infinitShuffle, args=(list(products), list(bags), lock, fillCosts, "Infinite_Shuffle", start))
+        thread = Process(target=infinitShuffle, args=(list(namedProducts), list(bags), lock, fillCosts, "Infinite_Shuffle", start))
         threads.append(thread)
         thread.start()
 
         # Smallest values first
-        products = sorted(products, key=lambda x: x[2], reverse=False)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_v_I", True, start))
+        namedProducts = sorted(namedProducts, key=lambda x: x[2], reverse=False)
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "p_sort_v_I", True, start))
         threads.append(thread)
         thread.start()
 
         # Biggest values first
-        products = sorted(products, key=lambda x: x[2], reverse=True)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_v_rev_I", True, start))
+        namedProducts = sorted(namedProducts, key=lambda x: x[2], reverse=True)
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "p_sort_v_rev_I", True, start))
         threads.append(thread)
         thread.start()
 
         # Biggest products first
-        products = sorted(products, key=lambda x: x[0]*x[1], reverse=True)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_s_rev_I", True, start))
+        namedProducts = sorted(namedProducts, key=lambda x: x[0]*x[1], reverse=True)
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "p_sort_s_rev_I", True, start))
         threads.append(thread)
         thread.start()
 
         # Biggest bags first
         bags = sorted(bags, key=lambda x: x[0]*x[1], reverse=True)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "b_sort_s_rev_I", True, start))
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "b_sort_s_rev_I", True, start))
         threads.append(thread)
         thread.start()
 
-        for rate in range(1, 100, 5):
+        for rate in range(1, 50, 2):
             # Biggest products combined with biggest values ???
-            products = sorted(products, key=lambda x: x[0]*x[1] + rate*x[2], reverse=True)
-            thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, "p_sort_sv_rev_I", True, start))
+            namedProducts = sorted(namedProducts, key=lambda x: x[0]*x[1] + rate*x[2], reverse=True)
+            thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "p_sort_sv_"+str(rate)+"_rev_I", True, start))
             threads.append(thread)
             thread.start()
 
