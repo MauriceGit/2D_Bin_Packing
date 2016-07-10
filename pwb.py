@@ -859,11 +859,14 @@ def infinitShuffle(products, bags, lock, fillCosts, initiator, start):
             thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(products), fillCosts, initiator, True, start))
             threads.append(thread)
             thread.start()
+            if i == 0:
+                thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagDumb, list(bags), list(products), fillCosts, initiator, True, start))
+                threads.append(thread)
+                thread.start()
         for t in threads:
             t.join()
 
 def infiniteA1Fast(bags, namedProducts, lock, fillCosts, initiator, start):
-
     permutations = itertools.permutations(bags, len(bags))
     for p in permutations:
         runA1Fast(list(p), list(namedProducts), lock, fillCosts, initiator, True, True, start)
@@ -872,7 +875,7 @@ def infiniteA0Fast(bags, namedProducts, lock, fillCosts, initiator, start):
 
     permutations = itertools.permutations(bags, len(bags))
     for p in permutations:
-        for rate in range(1, 20, 3):
+        for rate in range(0, 20, 3):
             # Biggest products combined with biggest values !
             tmpProducts = sorted(namedProducts, key=lambda x: x.width*x.height + rate*x.value, reverse=True)
 
@@ -920,22 +923,26 @@ if __name__ == '__main__':
         namedProducts.append(Product(width=p[0], height=p[1], value=p[2], pIndex=i, isPlaced=placed, realIndex=i))
 
     if True:
+        # IMPORTANT
         # Print all empty lists
         thread = Process(target=allEmptyBags, args=(list(bags), fillCosts, lock, "All_Empty", start))
         threads.append(thread)
         thread.start()
 
     if True:
+        # IMPORTANT
         # A1 slow!
         thread = Process(target=runA1Slow, args=(list(bags), list(namedProducts), lock, fillCosts, "A1_Slow_Value", True, True, start))
         threads.append(thread)
         thread.start()
 
+        # IMPORTANT
         # A1 fast - Trying all possible bag-combinations!
         thread = Process(target=infiniteA1Fast, args=(bags, namedProducts, lock, fillCosts, "A1_Fast_Value", start))
         threads.append(thread)
         thread.start()
 
+        # IMPORTANT
         # A0 slow!
         # Biggest products combined with biggest values !
         for rate in range(0, 20, 5):
@@ -961,33 +968,40 @@ if __name__ == '__main__':
         thread.start()
 
         # Smallest values first
-        namedProducts = sorted(namedProducts, key=lambda x: x[2], reverse=False)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "p_sort_v_I", True, start))
-        threads.append(thread)
-        thread.start()
+        #namedProducts = sorted(namedProducts, key=lambda x: x[2], reverse=False)
+        #thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "AAAA_p_sort_v_I", True, start))
+        #threads.append(thread)
+        #thread.start()
 
         # Biggest values first
-        namedProducts = sorted(namedProducts, key=lambda x: x[2], reverse=True)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "p_sort_v_rev_I", True, start))
-        threads.append(thread)
-        thread.start()
+        #namedProducts = sorted(namedProducts, key=lambda x: x[2], reverse=True)
+        #thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "AABB_p_sort_v_rev_I", True, start))
+        #threads.append(thread)
+        #thread.start()
 
         # Biggest products first
         namedProducts = sorted(namedProducts, key=lambda x: x[0]*x[1], reverse=True)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "p_sort_s_rev_I", True, start))
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "BBAA_p_sort_s_rev_I", True, start))
         threads.append(thread)
         thread.start()
 
+        # IMPORTANT
         # Biggest bags first
         bags = sorted(bags, key=lambda x: x[0]*x[1], reverse=True)
-        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "b_sort_s_rev_I", True, start))
+        thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "BBBB_b_sort_s_rev_I", True, start))
         threads.append(thread)
         thread.start()
 
-        for rate in range(1, 50, 2):
+        for rate in range(0, 50, 2):
             # Biggest products combined with biggest values ???
             namedProducts = sorted(namedProducts, key=lambda x: x[0]*x[1] + rate*x[2], reverse=True)
             thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagIntelligent, list(bags), list(namedProducts), fillCosts, "p_sort_sv_"+str(rate)+"_rev_I", True, start))
+            threads.append(thread)
+            thread.start()
+
+            # Biggest products combined with biggest values ???
+            namedProducts = sorted(namedProducts, key=lambda x: x[0]*x[1] + rate*x[2], reverse=True)
+            thread = Process(target=calcGreedyFilling, args=(lock, placeProductInBagDumb, list(bags), list(namedProducts), fillCosts, "DUMB_"+str(rate)+"_rev_I", True, start))
             threads.append(thread)
             thread.start()
 
