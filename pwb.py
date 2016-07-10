@@ -214,8 +214,9 @@ def fillBag(algorithm, bag, products, savedProducts, fillCosts):
     listToDelete = []
 
     for i in range(len(products)):
-        if algorithm(mask, bag[0], bag[1], products[i]):
-            listToDelete.append(i)
+        if not products[i].isPlaced:
+            if algorithm(mask, bag[0], bag[1], products[i]):
+                listToDelete.append(i)
 
     listToDelete = sorted(listToDelete)
     offset = 0
